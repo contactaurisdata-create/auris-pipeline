@@ -1,0 +1,26 @@
+name: BODACC Daily Pipeline
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch BODACC to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          python3 -c "
+          import urllib.request, json, os
+          url = 'https://bodacc-datadila.opendatasoft.com/api/explore/v2.1/catalog/datasets/annonces-commerciales/records?limit=100'
+          data = json.loads(urllib.request.urlopen(url).read())
+          su = os.environ['SUPABASE_URL']
+          sk = os.environ['SUPABASE_KEY']
+          for r in data.get('results', []):
+            row = json.dumps({'nom_entreprise': r.get('commercant',''), 'type_procedure': r.get('familleavis_lib',''), 'ville': r.get('ville',''), 'date_publication': r.get('dateparution',''), 'source': 'BODACC'}).encode()
+            req = urllib.request.Request(su+'/rest/v1/signaux_defaillance', data=row, headers={'apikey': sk, 'Authorization': 'Bearer '+sk, 'Content-Type': 'application/json', 'Prefer': 'resolution=ignore-duplicates'})
+            try: urllib.request.urlopen(req)
+            except: pass
+          "
